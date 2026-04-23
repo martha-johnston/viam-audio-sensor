@@ -1,0 +1,26 @@
+{
+  "$schema": "https://dl.viam.dev/module.schema.json",
+  "module_id": "devin-hilly:audio-sensor",
+  "visibility": "public",
+  "url": "https://github.com/martha-johnston/viam-audio-sensor",
+  "description": "A Viam sensor that consumes an audio_in component and reports whether audio is currently detected (RMS above a configurable threshold).",
+  "models": [
+    {
+      "api": "rdk:component:sensor",
+      "model": "devin-hilly:audio-sensor:audio-sensor",
+      "short_description": "Sensor that samples an audio_in component and reports audio_detected + RMS.",
+      "markdown_link": "README.md#model-devin-hillyaudio-sensoraudio-sensor"
+    }
+  ],
+  "entrypoint": "bin/audio-sensor",
+  "first_run": "",
+  "build": {
+    "build": "make module.tar.gz",
+    "setup": "make setup",
+    "path": "bin/module.tar.gz",
+    "arch": [
+      "linux/arm64",
+      "darwin/arm64"
+    ]
+  }
+}
