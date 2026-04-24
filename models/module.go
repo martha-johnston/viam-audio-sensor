@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"math"
 
 	"go.viam.com/rdk/components/audioin"
 	"go.viam.com/rdk/components/sensor"
@@ -100,26 +99,21 @@ func (s *audioSensor) Name() resource.Name {
 }
 
 // Readings requests `sample_seconds` of PCM16 audio from the configured
-// audio_in, computes its RMS level, and reports `audio_detected` when the
-// RMS exceeds the configured `threshold`. Also reports `stream_seconds` —
-// the playback position of the last chunk we sampled, derived from the chunk's
-// StartTimestampNanoseconds (which audio-replay sets to the stream position).
+// audio_in, tracks the peak absolute sample value over that window, and
+// reports it alongside the stream playback position and the configured
+// threshold.
 func (s *audioSensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	chunkChan, err := s.audioIn.GetAudio(ctx, rutils.CodecPCM16, s.sampleSeconds, 0, nil)
 	if err != nil {
 		return nil, fmt.Errorf("GetAudio failed: %w", err)
 	}
 
-	var sumSquares float64
-	var sampleCount int64
-	var chunkCount int64
 	var peak int16
 	var latestTimestampNs int64
 	for chunk := range chunkChan {
 		if chunk == nil {
 			continue
 		}
-		chunkCount++
 		if chunk.EndTimestampNanoseconds > latestTimestampNs {
 			latestTimestampNs = chunk.EndTimestampNanoseconds
 		}
@@ -131,29 +125,15 @@ func (s *audioSensor) Readings(ctx context.Context, extra map[string]interface{}
 			} else if -sample > peak {
 				peak = -sample
 			}
-			f := float64(sample)
-			sumSquares += f * f
-			sampleCount++
 		}
 	}
 
-	var rms float64
-	if sampleCount > 0 {
-		rms = math.Sqrt(sumSquares / float64(sampleCount))
-	}
 	streamSeconds := float64(latestTimestampNs) / 1e9
-
-	s.logger.Debugf("Readings: chunks=%d samples=%d rms=%.2f peak=%d threshold=%.2f stream_seconds=%.2f",
-		chunkCount, sampleCount, rms, peak, s.threshold, streamSeconds)
-
 	return map[string]interface{}{
-		"audio_detected": rms > s.threshold,
-		"rms":            rms,
 		"peak":           int64(peak),
-		"samples":        sampleCount,
-		"chunks":         chunkCount,
-		"threshold":      s.threshold,
 		"stream_seconds": streamSeconds,
+		"threshold":      s.threshold,
+		"sound_detected": float64(peak) > s.threshold,
 	}, nil
 }
 
